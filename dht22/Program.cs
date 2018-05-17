@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Threading;
+using System.Text;
 using Microsoft.SPOT;
 using Microsoft.SPOT.Presentation;
 using Microsoft.SPOT.Presentation.Controls;
@@ -14,6 +15,16 @@ using Gadgeteer.Networking;
 using GT = Gadgeteer;
 using GTM = Gadgeteer.Modules;
 using Gadgeteer.Modules.GHIElectronics;
+
+// Correct time
+using System.Net;
+using Microsoft.SPOT.Time;
+
+// MQTT
+using uPLibrary.Networking.M2Mqtt;
+
+// JSON
+using Json.NETMF;
 
 namespace dht22
 {
@@ -71,9 +82,10 @@ namespace dht22
         /// </summary>
         public bool ReadSensor()
         {
-            uint[] buffer = new uint[90];
+            uint[] buffer = new uint[80];
             int nb, i;
 
+            /* REQUEST SENSOR MEASURE */
             // Testing if the 2 pins are connected together
             bool rt = _dht22in.InternalPort.Read();  // Should be true
             _dht22out.Write(false);  // "low down" : initiate transmission
@@ -84,30 +96,40 @@ namespace dht22
                 _dht22out.Write(true);   //"high up" (standby state)
                 return false;
             }
-            Thread.Sleep(6);       // For "at least 1ms" as per the documentation
+            Thread.Sleep(1);       // For "at least 1ms" as per the documentation
             _dht22out.Write(true);   //"high up" then listen
-            //nb = _dht22in.Read(false, buffer, 0, 90, 10);  // get the sensor answer
-            nb = _dht22in.Read(false, buffer, 0, 40);  // get the sensor answer
-            //_dht22in.ReadTimeout = ;
-            if (nb < 30)
+
+            /* READ MEASURE */
+            _dht22out.Active = false; //Tristate Read
+            _dht22in.ReadTimeout = 500; // Timeout value in ms
+            nb = _dht22in.Read(false, buffer, 0, 80);  // get the sensor answer
+            _dht22out.Active = true; // Tristate Write
+            _dht22out.Write(true);   //"high up" 
+            if (nb < 71)
             {
                 LastError = "Did not receive enough data from the sensor";
                 return false;
             }
+
+            /* CONVERT MEASURE */
             nb -= 2; // skip last 50us down          
             byte checksum = 0;
             uint T = 0, H = 0;
-            for (i = 0; i < 8; i++, nb -= 2) checksum |= (byte)(buffer[nb] > 50 ? 1 << i : 0);
-            for (i = 0; i < 16; i++, nb -= 2) T |= (uint)(buffer[nb] > 50 ? 1 << i : 0);
+            // Convert CheckSum
+            for (i = 0; i < 8; i++, nb -= 2) checksum |= (byte)(buffer[nb] > 35 ? 1 << i : 0);
+            // Convert Temperature
+            for (i = 0; i < 16; i++, nb -= 2) T |= (uint)(buffer[nb] > 35 ? 1 << i : 0);
             Temperature = ((float)(T & 0x7FFF)) * ((T & 0x8000) > 0 ? -1 : 1) / 10;
-            for (i = 0; i < 16; i++, nb -= 2) H |= (uint)(buffer[nb] > 50 ? 1 << i : 0);
+            // Convert Humidity
+            for (i = 0; i < 11; i++, nb -= 2) H |= (uint)(buffer[nb] > 35 ? 1 << i : 0);
             Humidity = ((float)H) / 10;
-
+            // Control CheckSum
             if ((((H & 0xFF) + (H >> 8) + (T & 0xFF) + (T >> 8)) & 0xFF) != checksum)
             {
                 LastError = "Checksum Error";
                 return false;
             }
+            // No error case
             LastError = "";
             return true;
         }
@@ -116,11 +138,17 @@ namespace dht22
 
     public partial class Program
     {
-        private GT.Timer gcTimer = new GT.Timer(5000);
+        private GT.Timer gcTimer = new GT.Timer(3000);
 
-        // Create sensor
+        // Sensor and relative data
         DHT22 tempSensor;
-        String tmpStr;
+        String temperature, humidity;
+
+        // HTTP page of board
+        byte[] HTML;
+
+        // JSON
+        String json;
 
         // This method is run when the mainboard is powered up or reset.   
         void ProgramStarted()
@@ -139,8 +167,8 @@ namespace dht22
                 timer.Start();
             *******************************************************************************************/
 
+            // Create sensor
             tempSensor = new DHT22(GT.Socket.GetSocket(11, true, breakout, null).CpuPins[3], GT.Socket.GetSocket(11, true, breakout, null).CpuPins[6]);
-            //tempSensor = new DHT22( (Cpu.Pin)  );
 
             // Use Debug.Print to show messages in Visual Studio's "Output" window during debugging.
             Debug.Print("Program Started");
@@ -148,28 +176,107 @@ namespace dht22
             gcTimer.Tick += gcTimer_Tick;
             gcTimer.Start();
 
+            // Ethernet settings and basic debug
+            ethernetJ11D.UseThisNetworkInterface();
+            ethernetJ11D.NetworkDown += ethernetJ11D_NetworkDown;
+            ethernetJ11D.NetworkUp += ethernetJ11D_NetworkUp;
+
+            // Web server
+            new Thread(RunWebServer).Start();
+
         }
 
         //Tick Handler
         void gcTimer_Tick(GT.Timer timer)
         {
-            Debug.Print("tick");
+            bool error_sensor = tempSensor.ReadSensor();
 
-            tempSensor.ReadSensor();
-
-            // if(error_sensor){
-            Debug.Print("Staying ALIIIIIIIVE!");
-            //tmpStr = "Temperature:\t" + tempSensor.Temperature.ToString();
-            //Debug.Print(tmpStr);
-            //tmpStr = "Humidity:\t\t" + tempSensor.Humidity.ToString();
-            //Debug.Print(tmpStr);
-            //Thread.Sleep(1000);
-            //}
-            // else {
-            Debug.Print("ERROR :( ");
-            //Debug.Print(tempSensor.LastError);
-            //}
+            if (error_sensor)
+            {
+                // Measure
+                temperature = tempSensor.Temperature.ToString();
+                Debug.Print("Temperature:\t" + temperature);
+                humidity = tempSensor.Humidity.ToString();
+                Debug.Print("Humidity:\t\t" + humidity);
+                // Update web data
+                HTML = Encoding.UTF8.GetBytes("<html><body>" +
+                    "<h1>Hosted on .NET Gadgeteer</h1>" +
+                    "<p>Temperature:" + temperature + "</p>" +
+                    "<p>Humidity:" + humidity + "</p>" +
+                    "</body></html>");
+                // Get json
+                Hashtable json_dict = new Hashtable();
+                json_dict.Add("Temperature", temperature);
+                json_dict.Add("Humidity", humidity);
+                json_dict.Add("Date", DateTime.Now);
+                json = JsonSerializer.SerializeObject(json_dict);
+                Debug.Print(json);
+            }
+            else
+            {
+                Debug.Print(tempSensor.LastError);
+            }
         }
 
+        // Network up handler (just prints on debug)
+        void ethernetJ11D_NetworkDown(GTM.Module.NetworkModule sender, GTM.Module.NetworkModule.NetworkState state)
+        {
+            Debug.Print("Network is down");
+        }
+
+        // Network down handler (prints IP)
+        void ethernetJ11D_NetworkUp(GTM.Module.NetworkModule sender, GTM.Module.NetworkModule.NetworkState state)
+        {
+            Debug.Print("Network is up");
+            Debug.Print("IP is: " + ethernetJ11D.NetworkSettings.IPAddress);
+            
+            // Correct time
+#if false
+            TimeServiceSettings settings = new TimeServiceSettings();
+            settings.ForceSyncAtWakeUp = true;
+            settings.RefreshTime = 1800;    // in seconds.
+
+            Byte[] primaryAddress = { 216, 239, 35, 8 };
+            settings.PrimaryServer = primaryAddress;
+            Byte[] secondaryAddress = { 212, 45, 144, 206 };
+            settings.AlternateServer = secondaryAddress;
+
+            TimeService.Settings = settings;
+
+            // Add the time zone offset to the retrieved UTC Time (in this example, it assumes that
+            // time zone is GMT+1).
+            TimeService.SetTimeZoneOffset(60);
+
+            TimeService.Start();
+#endif
+#if true
+
+#endif
+        }
+
+        // Web server thread
+        void RunWebServer()
+        {
+            // Wait for the network...
+            while (ethernetJ11D.IsNetworkUp == false)
+            {
+                Debug.Print("Waiting...");
+                Thread.Sleep(1000);
+            }
+            // Start the server
+            WebServer.StartLocalServer(ethernetJ11D.NetworkSettings.IPAddress, 80);
+            WebServer.DefaultEvent.WebEventReceived += DefaultEvent_WebEventReceived;
+            while (true)
+            {
+                Thread.Sleep(1000);
+            }
+        }
+
+        // HTTP request handler
+        void DefaultEvent_WebEventReceived(string path, WebServer.HttpMethod method, Responder responder)
+        {
+            // We always send the same page back
+            responder.Respond(HTML, "text/html;charset=utf-8");
+        }
     }
 }
