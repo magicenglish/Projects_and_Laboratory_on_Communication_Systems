@@ -76,6 +76,9 @@
     <Reference Include="GTM.GHIElectronics.EthernetJ11D, Version=4.3.8.1, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
     </Reference>
+    <Reference Include="GTM.GHIElectronics.SDCard, Version=4.3.8.1, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
     <Reference Include="GTM.GHIElectronics.USBClientEDP, Version=4.3.8.1, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
     </Reference>
@@ -93,7 +96,9 @@
     <Reference Include="Microsoft.SPOT.Net" />
     <Reference Include="Microsoft.SPOT.Time" />
     <Reference Include="Microsoft.SPOT.TinyCore" />
+    <Reference Include="Microsoft.SPOT.Wireless.IEEE_802_15_4" />
     <Reference Include="mscorlib" />
+    <Reference Include="System" />
     <Reference Include="System.Http" />
     <Reference Include="System.IO" />
   </ItemGroup>

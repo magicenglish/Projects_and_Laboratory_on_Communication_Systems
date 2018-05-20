@@ -24,6 +24,9 @@ namespace dht22 {
         /// <summary>The Breakout module using socket 11 of the mainboard.</summary>
         private Gadgeteer.Modules.GHIElectronics.Breakout breakout;
         
+        /// <summary>The SD Card module using socket 5 of the mainboard.</summary>
+        private Gadgeteer.Modules.GHIElectronics.SDCard sdCard;
+        
         /// <summary>This property provides access to the Mainboard API. This is normally not necessary for an end user program.</summary>
         protected new static GHIElectronics.Gadgeteer.FEZSpiderII Mainboard {
             get {
@@ -49,6 +52,7 @@ namespace dht22 {
             this.usbClientEDP = new GTM.GHIElectronics.USBClientEDP(1);
             this.ethernetJ11D = new GTM.GHIElectronics.EthernetJ11D(7);
             this.breakout = new GTM.GHIElectronics.Breakout(11);
+            this.sdCard = new GTM.GHIElectronics.SDCard(5);
         }
     }
 }
