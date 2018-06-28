@@ -1,4 +1,12 @@
-﻿using System;
+﻿/* ToDo:
+ * 1) Handle networkDown and publish: make a FIFO in order to avoid publishing when the network is off
+ *      - Directly in Publish method?
+ *      - While calling Publish function?
+ * 2) Check QOS: is it respected? Does it work?
+ * 3) Check absence of SDCard: do a local buffer again?
+ * 4) Try to organise the buffer in order to use the SDCard when it is attached and the local one when it isn't
+ */
+using System;
 using System.Collections;
 using System.Threading;
 using System.Text;
@@ -11,6 +19,12 @@ using Microsoft.SPOT.Touch;
 using Microsoft.SPOT.Hardware;
 using GHI.IO;
 
+// Network security
+using System.Security;
+using System.Security.Cryptography.X509Certificates;
+using Microsoft.SPOT.Net.Security;
+using Microsoft.SPOT.Cryptoki;
+
 using Gadgeteer.Networking;
 using GT = Gadgeteer;
 using GTM = Gadgeteer.Modules;
@@ -22,24 +36,28 @@ using Microsoft.SPOT.Time;
 
 // MQTT
 using uPLibrary.Networking.M2Mqtt;
+using uPLibrary.Networking.M2Mqtt.Messages;
 
 // JSON
 using Json.NETMF;
 
+//temp
+using System.Net.Sockets;
+
 namespace dht22 {
     /// <summary>
-    /// Class to read the single wire Humitidy/Temperature DHT22 sensor
+    /// Class to read the single wire Humidity/Temperature DHT22 sensor
     /// It uses 2 interrupt pins connected together to access the sensor quick enough
     /// </summary>
     public class DHT22 : IDisposable {
 
         /// <summary>
-        /// Temperature in celcius degres
+        /// Temperature in Celsius degrees
         /// </summary>
         public float Temperature { get; private set; }
 
         /// <summary>
-        /// Humidity in percents
+        /// Humidity percentage
         /// </summary>
         public float Humidity { get; private set; }
 
@@ -52,14 +70,14 @@ namespace dht22 {
         private SignalCapture _dht22in;
 
         /// <summary>
-        /// Constructor. Needs to interrupt pins to be provided and linked together in Hardware. *
+        /// Constructor. Needs to interrupt pins to be provided and linked together in Hardware.
         /// Blocking call for 1s to give sensor time to initialize.
         /// </summary>
         public DHT22(Cpu.Pin In, Cpu.Pin Out) {
             _dht22out = new TristatePort(Out, false, false, Port.ResistorMode.PullUp);
             _dht22in = new SignalCapture(In, Port.ResistorMode.PullUp, Port.InterruptMode.InterruptEdgeBoth);
             if (_dht22out.Active == false) _dht22out.Active = true; // Make tristateport "output" 
-            _dht22out.Write(true);   //"high up" (standby state)
+            _dht22out.Write(true); // "high up" (standby state)
             Thread.Sleep(1000); // 1s to pass the "unstable status" as per the documentation
         }
 
@@ -74,31 +92,31 @@ namespace dht22 {
 
         /// <summary>
         /// Access the sensor. Returns true if successful, false if it fails.
-        /// If false, please check the LastError value for reason.
+        /// If false, please check the LastError value for more info.
         /// </summary>
         public bool ReadSensor() {
             uint[] buffer = new uint[80];
             int nb, i;
 
             /* REQUEST SENSOR MEASURE */
-            // Testing if the 2 pins are connected together
+            // Test if the 2 pins are connected together
             bool rt = _dht22in.InternalPort.Read();  // Should be true
-            _dht22out.Write(false);  // "low down" : initiate transmission
+            _dht22out.Write(false);  // "low down": initiate transmission
             bool rf = _dht22in.InternalPort.Read();  // Should be false
             if (!rt || rf) {
                 LastError = "The 2 pins are not hardwired together !";
-                _dht22out.Write(true);   //"high up" (standby state)
+                _dht22out.Write(true);   // "high up" (standby state)
                 return false;
             }
-            Thread.Sleep(1);       // For "at least 1ms" as per the documentation
-            _dht22out.Write(true);   //"high up" then listen
+            Thread.Sleep(1);         // For "at least 1ms" as per the documentation
+            _dht22out.Write(true);   // "high up" then listen
 
             /* READ MEASURE */
-            _dht22out.Active = false; //Tristate Read
+            _dht22out.Active = false; // Tristate Read
             _dht22in.ReadTimeout = 500; // Timeout value in ms
             nb = _dht22in.Read(false, buffer, 0, 80);  // get the sensor answer
             _dht22out.Active = true; // Tristate Write
-            _dht22out.Write(true);   //"high up" 
+            _dht22out.Write(true);   // "high up" 
             if (nb < 71) {
                 LastError = "Did not receive enough data from the sensor";
                 return false;
@@ -116,7 +134,7 @@ namespace dht22 {
             // Convert Humidity
             for (i = 0; i < 11; i++, nb -= 2) H |= (uint)(buffer[nb] > 35 ? 1 << i : 0);
             Humidity = ((float)H) / 10;
-            // Control CheckSum
+            // Check CheckSum
             if ((((H & 0xFF) + (H >> 8) + (T & 0xFF) + (T >> 8)) & 0xFF) != checksum) {
                 LastError = "Checksum Error";
                 return false;
@@ -144,6 +162,21 @@ namespace dht22 {
 
         // SD_Card saved file index
         uint saveIndex;
+
+        /// <summary>
+        /// AWS EC2 Endpoint: IPv4 Address of the machine
+        /// </summary>
+        private const string IotEndpoint = "18.195.215.55";
+
+        /// <summary>
+        /// Unencrypted port used by AWS EC2 machine
+        /// </summary>
+        private const int BrokerPort = 1883;
+        /// <summary>
+        /// Mqtt Topic that will be received from the EC2 (MosquittoBridge) and forwarded to AWS IoT
+        /// </summary>
+        private const string Topic = "t1";
+
 
         // This method is run when the mainboard is powered up or reset.   
         void ProgramStarted() {
@@ -209,65 +242,46 @@ namespace dht22 {
                 json = JsonSerializer.SerializeObject(json_dict);
                 Debug.Print(json);
 
+                /* Write data on SDCard */
                 SD_Write(json);
-            }
-            else {
+                /* Publish Mqtt topic*/
+                Publish(json);
+            } else {
                 Debug.Print(tempSensor.LastError);
             }
         }
 
-        // Network up handler (just prints on debug)
+        // Network down handler (just prints on debug)
         void ethernetJ11D_NetworkDown(GTM.Module.NetworkModule sender, GTM.Module.NetworkModule.NetworkState state) {
             Debug.Print("Network is down");
         }
 
-        // Network down handler (prints IP)
+        // Network up handler (prints IP)
         void ethernetJ11D_NetworkUp(GTM.Module.NetworkModule sender, GTM.Module.NetworkModule.NetworkState state) {
+            while (ethernetJ11D.NetworkSettings.IPAddress == IPAddress.Any.ToString()) {
+                Debug.Print("Waiting for network...");
+            }
             Debug.Print("Network is up");
             Debug.Print("IP is: " + ethernetJ11D.NetworkSettings.IPAddress);
 
-            //const string ntpServer = "pool.ntp.org";
-            //var ntpData = new byte[48];
-            //ntpData[0] = 0x1B; //LeapIndicator = 0 (no warning), VersionNum = 3 (IPv4 only), Mode = 3 (Client Mode)
+            TimeServiceSettings time = new TimeServiceSettings() {
+                ForceSyncAtWakeUp = true
+            };
 
-            //var addresses = Dns.GetHostEntry(ntpServer).AddressList;
-            //var ipEndPoint = new IPEndPoint(addresses[0], 123);
-            ////var socket = new Socket(AddressFamily.InterNetwork, SocketType.Dgram, ProtocolType.Udp);
+            IPAddress[] address = Dns.GetHostEntry("time.windows.com").AddressList;
+            if (address != null)
+                time.PrimaryServer = address[0].GetAddressBytes();
 
-            ////socket.Connect(ipEndPoint);
-            ////socket.Send(ntpData);
-            ////socket.Receive(ntpData);
-            ////socket.Close();
-
-            //ulong intPart = (ulong)ntpData[40] << 24 | (ulong)ntpData[41] << 16 | (ulong)ntpData[42] << 8 | (ulong)ntpData[43];
-            //ulong fractPart = (ulong)ntpData[44] << 24 | (ulong)ntpData[45] << 16 | (ulong)ntpData[46] << 8 | (ulong)ntpData[47];
-
-            //var milliseconds = (intPart * 1000) + ((fractPart * 1000) / 0x100000000L);
-            //var networkDateTime = (new DateTime(1900, 1, 1)).AddMilliseconds((long)milliseconds);
-
-            ////return networkDateTime;
-
-            TimeServiceSettings settings = new TimeServiceSettings();
-            settings.RefreshTime = 10; // every 10 seconds
-            settings.ForceSyncAtWakeUp = true;
+            address = Dns.GetHostEntry("time.nist.gov").AddressList;
+            if (address != null)
+                time.AlternateServer = address[0].GetAddressBytes();
 
             TimeService.SystemTimeChanged += TimeService_SystemTimeChanged;
             TimeService.TimeSyncFailed += TimeService_TimeSyncFailed;
-            TimeService.SetTimeZoneOffset(60);
-
-            IPHostEntry hostEntry = Dns.GetHostEntry("time.nist.gov");
-            IPAddress[] address = hostEntry.AddressList;
-            if (address != null)
-                settings.PrimaryServer = address[0].GetAddressBytes();
-
-            hostEntry = Dns.GetHostEntry("time.windows.com");
-            address = hostEntry.AddressList;
-            if (address != null)
-                settings.AlternateServer = address[0].GetAddressBytes();
-
-            TimeService.Settings = settings;
-
+            TimeService.Settings = time;
+            TimeService.SetTimeZoneOffset(0);
             TimeService.Start();
+
         }
 
         void TimeService_TimeSyncFailed(object sender, TimeSyncFailedEventArgs e) {
@@ -307,12 +321,11 @@ namespace dht22 {
             }
             try {
                 String filename = "save_" + saveIndex + ".txt";
-                Debug.Print("Saving .....");
+                Debug.Print("Saving.....");
                 sdCard.StorageDevice.WriteFile(filename, UTF8Encoding.UTF8.GetBytes(toSave));
                 Debug.Print("string saved to: " + filename);
                 saveIndex++;
-            }
-            catch (Exception ex) {
+            } catch (Exception ex) {
                 Debug.Print("SD Card Error");
             }
         }
@@ -320,5 +333,28 @@ namespace dht22 {
          * Send ID, Name, Category (4), GPS Coordinates, Sensor (DHT22)
          * */
 
+        /// <summary>
+        /// Configure client and publish a message
+        /// </summary>
+        public void Publish(string message) {
+            try {
+                // create client instance 
+                MqttClient client = new MqttClient(IPAddress.Parse(IotEndpoint));
+
+                //client naming has to be unique if there was more than one publisher
+                //client.Connect("GIANNI");
+                string clientId = Guid.NewGuid().ToString();
+                client.Connect(clientId);
+
+                // publish a message on topic with QoS 1 
+                client.Publish(Topic, Encoding.UTF8.GetBytes(message), MqttMsgBase.QOS_LEVEL_AT_LEAST_ONCE, false);
+                // this was in for debug purposes but it's useful to see something in the console
+                if (client.IsConnected) {
+                    Debug.Print("SUCCESS!");
+                }
+            } catch (Exception e) {
+                Debug.Print("EXCEPTION CAUGHT: " + e.Message);
+            }
+        }
     }
 }
