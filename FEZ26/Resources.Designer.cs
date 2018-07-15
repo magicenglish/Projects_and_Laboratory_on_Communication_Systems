@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace dht22
+namespace FEZ26
 {
     
     internal partial class Resources
@@ -20,7 +20,7 @@ namespace dht22
             {
                 if ((Resources.manager == null))
                 {
-                    Resources.manager = new System.Resources.ResourceManager("dht22.Resources", typeof(Resources).Assembly);
+                    Resources.manager = new System.Resources.ResourceManager("FEZ26.Resources", typeof(Resources).Assembly);
                 }
                 return Resources.manager;
             }

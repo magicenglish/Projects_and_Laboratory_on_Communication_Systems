@@ -44,121 +44,24 @@ using Json.NETMF;
 //temp
 using System.Net.Sockets;
 
-namespace dht22 {
-    /// <summary>
-    /// Class to read the single wire Humidity/Temperature DHT22 sensor
-    /// It uses 2 interrupt pins connected together to access the sensor quick enough
-    /// </summary>
-    public class DHT22 : IDisposable {
-
-        /// <summary>
-        /// Temperature in Celsius degrees
-        /// </summary>
-        public float Temperature { get; private set; }
-
-        /// <summary>
-        /// Humidity percentage
-        /// </summary>
-        public float Humidity { get; private set; }
-
-        /// <summary>
-        /// If not empty, gives the last error that occured
-        /// </summary>
-        public string LastError { get; private set; }
-
-        private TristatePort _dht22out;
-        private SignalCapture _dht22in;
-
-        /// <summary>
-        /// Constructor. Needs to interrupt pins to be provided and linked together in Hardware.
-        /// Blocking call for 1s to give sensor time to initialize.
-        /// </summary>
-        public DHT22(Cpu.Pin In, Cpu.Pin Out) {
-            _dht22out = new TristatePort(Out, false, false, Port.ResistorMode.PullUp);
-            _dht22in = new SignalCapture(In, Port.ResistorMode.PullUp, Port.InterruptMode.InterruptEdgeBoth);
-            if (_dht22out.Active == false) _dht22out.Active = true; // Make tristateport "output" 
-            _dht22out.Write(true); // "high up" (standby state)
-            Thread.Sleep(1000); // 1s to pass the "unstable status" as per the documentation
-        }
-
-        #region IDisposable Members
-
-        public void Dispose() {
-            _dht22out.Dispose();
-            _dht22in.Dispose();
-        }
-
-        #endregion
-
-        /// <summary>
-        /// Access the sensor. Returns true if successful, false if it fails.
-        /// If false, please check the LastError value for more info.
-        /// </summary>
-        public bool ReadSensor() {
-            uint[] buffer = new uint[80];
-            int nb, i;
-
-            /* REQUEST SENSOR MEASURE */
-            // Test if the 2 pins are connected together
-            bool rt = _dht22in.InternalPort.Read();  // Should be true
-            _dht22out.Write(false);  // "low down": initiate transmission
-            bool rf = _dht22in.InternalPort.Read();  // Should be false
-            if (!rt || rf) {
-                LastError = "The 2 pins are not hardwired together !";
-                _dht22out.Write(true);   // "high up" (standby state)
-                return false;
-            }
-            Thread.Sleep(1);         // For "at least 1ms" as per the documentation
-            _dht22out.Write(true);   // "high up" then listen
-
-            /* READ MEASURE */
-            _dht22out.Active = false; // Tristate Read
-            _dht22in.ReadTimeout = 500; // Timeout value in ms
-            nb = _dht22in.Read(false, buffer, 0, 80);  // get the sensor answer
-            _dht22out.Active = true; // Tristate Write
-            _dht22out.Write(true);   // "high up" 
-            if (nb < 71) {
-                LastError = "Did not receive enough data from the sensor";
-                return false;
-            }
-
-            /* CONVERT MEASURE */
-            nb -= 2; // skip last 50us down          
-            byte checksum = 0;
-            uint T = 0, H = 0;
-            // Convert CheckSum
-            for (i = 0; i < 8; i++, nb -= 2) checksum |= (byte)(buffer[nb] > 35 ? 1 << i : 0);
-            // Convert Temperature
-            for (i = 0; i < 16; i++, nb -= 2) T |= (uint)(buffer[nb] > 35 ? 1 << i : 0);
-            Temperature = ((float)(T & 0x7FFF)) * ((T & 0x8000) > 0 ? -1 : 1) / 10;
-            // Convert Humidity
-            for (i = 0; i < 11; i++, nb -= 2) H |= (uint)(buffer[nb] > 35 ? 1 << i : 0);
-            Humidity = ((float)H) / 10;
-            // Check CheckSum
-            if ((((H & 0xFF) + (H >> 8) + (T & 0xFF) + (T >> 8)) & 0xFF) != checksum) {
-                LastError = "Checksum Error";
-                return false;
-            }
-            // No error case
-            LastError = "";
-            return true;
-        }
-    }
-
+namespace FEZ26 {
 
     public partial class Program {
+        // JSON Format Version
+        uint json_version = 2;
+
         // Timer
         private GT.Timer gcTimer = new GT.Timer(3000);
 
         // Sensor and relative data
         DHT22 tempSensor;
-        String temperature, humidity;
+        String temperature, humidity, brightness;
 
         // HTTP page of board
         byte[] HTML;
 
         // JSON string to be saved and sent
-        String json;
+        String sensor1_json, sensor2_json, sensor3_json;
 
         // SD_Card saved file index
         uint saveIndex;
@@ -166,7 +69,7 @@ namespace dht22 {
         /// <summary>
         /// AWS EC2 Endpoint: IPv4 Address of the machine
         /// </summary>
-        private const string IotEndpoint = "18.195.215.55";
+        private const string IotEndpoint = "18.184.253.247";
 
         /// <summary>
         /// Unencrypted port used by AWS EC2 machine
@@ -217,10 +120,19 @@ namespace dht22 {
 
         // Tick Handler
         void gcTimer_Tick(GT.Timer timer) {
-            bool error_sensor = tempSensor.ReadSensor();
 
-            if (error_sensor) {
-                // Measure
+            // Preparing JSON file to send to AWS
+            String sensor1_json = "{ \"id\": 1, ";
+            String sensor2_json = "{ \"id\": 2, ";
+            String sensor3_json = "{ \"id\": 3, ";
+
+            /* Temperature and Humidity measurement */
+            bool readTH = tempSensor.ReadSensor();
+            sensor1_json += "\"iso_timestamp\": \"" + DateTime.UtcNow.ToString("s") +"+00:00\", ";
+            sensor2_json += "\"iso_timestamp\": \"" + DateTime.UtcNow.ToString("s") +"+00:00\", ";
+
+            if (readTH) {
+                /* Measure read and save */
                 temperature = tempSensor.Temperature.ToString("F");
                 Debug.Print("Temperature:\t" + temperature);
                 humidity = tempSensor.Humidity.ToString("F");
@@ -233,22 +145,61 @@ namespace dht22 {
                     "<p>Humidity:" + humidity + "</p>" +
                     "</body></html>");
 
-                // Get JSON
-                Hashtable json_dict = new Hashtable();
-                json_dict.Add("Temperature", temperature);
-                json_dict.Add("Humidity", humidity);
-                json_dict.Add("Date", DateTime.Now);
-                json_dict.Add("SensorID", "Gianni_DHT22");
-                json = JsonSerializer.SerializeObject(json_dict);
-                Debug.Print(json);
 
-                /* Write data on SDCard */
-                SD_Write(json);
-                /* Publish Mqtt topic*/
-                Publish(json);
+                sensor1_json += "\"value\": " + temperature + ", ";
+                sensor2_json += "\"value\": " + humidity + ", ";
+                /* Sensor Status OK" */ 
+                sensor1_json += "\"status\": \"OK\" }";
+                sensor2_json += "\"status\": \"OK\" }";
             } else {
                 Debug.Print(tempSensor.LastError);
+                /* Sensor Status FAIL" */ 
+                sensor1_json += "\"value\": -999, ";
+                sensor2_json += "\"value\": -999, ";
+                sensor1_json += "\"status\": \"FAIL\" }";
+                sensor2_json += "\"status\": \"FAIL\" }";
             }
+
+            Debug.Print(sensor1_json);
+            Debug.Print(sensor2_json);
+
+            //ToDO: insert brightness measurement 
+            /* Brightness measurement */
+            // ToDO: call read function
+            /* TEMP */
+            bool readB = false; // to change with the one in the next line
+            // bool readB = brightSensor.ReadSensor();
+            sensor3_json += "\"iso_timestamp\": \"" + DateTime.UtcNow.ToString("s") +"+00:00\", ";
+
+            if (readB) {
+                /* TEMP */
+                // brightness = brightSensor.Brightness.ToString("F");
+                Debug.Print("Brightness:\t\t" + brightness);
+                sensor3_json += "\"value\": " + brightness + ", ";
+                /* Sensor Status OK" */ 
+                sensor3_json += "\"status\": \"OK\" }";
+            } else {
+                /* Sensor Status FAIL */ 
+                sensor3_json += "\"value\": -999, ";
+                sensor3_json += "\"status\": \"FAIL\" }";
+            }
+
+            Debug.Print(sensor3_json);
+
+            String measurements_json = 
+                "{ \"version\": " + json_version + ", " +
+                "\"device_id\": \"FEZ26\", " +
+                "\"iso_timestamp\": \"" + DateTime.UtcNow.ToString("s") +"+00:00\", " +
+                "\"measurements\": [" +
+                sensor1_json + ", " + sensor2_json + ", " + sensor3_json + " ] }";
+
+            Debug.Print(measurements_json);
+
+            /* Write data on SDCard */
+            SD_Write(measurements_json);
+            /* Publish Mqtt topic*/
+            Publish(measurements_json);
+
         }
 
         // Network down handler (just prints on debug)
@@ -339,11 +290,15 @@ namespace dht22 {
         public void Publish(string message) {
             try {
                 // create client instance 
-                MqttClient client = new MqttClient(IPAddress.Parse(IotEndpoint));
+
+                //ToDO: check if this works
+                //MqttClient client = new MqttClient(IPAddress.Parse(IotEndpoint));
+                MqttClient client = new MqttClient(IotEndpoint);
 
                 //client naming has to be unique if there was more than one publisher
                 //client.Connect("GIANNI");
                 string clientId = Guid.NewGuid().ToString();
+                //ToDO: Handle exception - MQTT not working
                 client.Connect(clientId);
 
                 // publish a message on topic with QoS 1 

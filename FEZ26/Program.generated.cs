@@ -8,7 +8,7 @@
 // </auto-generated>
 //------------------------------------------------------------------------------
 
-namespace dht22 {
+namespace FEZ26 {
     using Gadgeteer;
     using GTM = Gadgeteer.Modules;
     

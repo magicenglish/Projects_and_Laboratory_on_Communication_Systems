@@ -3,7 +3,7 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio 2013
 VisualStudioVersion = 12.0.40629.0
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "dht22", "dht22\dht22.csproj", "{1B4E6C96-49C9-404F-B958-2177A6A4C02E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FEZ26", "FEZ26\FEZ26.csproj", "{1B4E6C96-49C9-404F-B958-2177A6A4C02E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

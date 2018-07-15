@@ -36,9 +36,14 @@
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
+  <PropertyGroup>
+    <StartupObject>
+    </StartupObject>
+  </PropertyGroup>
   <!-- Everything below here is custom to .NET MF / Gadgeteer template-->
   <Import Project="$(NetMfTargetsBaseDir)$(TargetFrameworkVersion)\CSharp.Targets" />
   <ItemGroup>
+    <Compile Include="DHT22.cs" />
     <Compile Include="Program.generated.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
@@ -122,6 +127,10 @@
       <DependentUpon>Program.gadgeteer</DependentUpon>
     </None>
     <None Include="Resources\certificate.pem.crt" />
+    <None Include="Resources\FEZ26_configuration.json" />
+    <None Include="Resources\FEZ26_sensor1.json" />
+    <None Include="Resources\FEZ26_sensor2.json" />
+    <None Include="Resources\FEZ26_sensor3.json" />
     <None Include="Resources\NinaB.tinyfnt" />
     <None Include="Resources\root_ca.pem.crt" />
     <None Include="Resources\small.tinyfnt" />
