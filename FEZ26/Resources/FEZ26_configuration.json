@@ -6,23 +6,23 @@
   "type": "environment",
   "sensors": [
     {
-      "id":   "1",
+      "id":   "0",
       "name": "DHT22",
       "type": "temperature"
     },
     {
-      "id":   "2",
+        "id": "1",
       "name": "DHT22",
       "type": "humidity"
     },
     {
-      "id":   "3",
-      "name": "name_brightness",
+      "id":   "2",
+      "name": "Brightness_sensor",
       "type": "other"
     }
   ],
   "description": "Sensors of environment analysis",
-  "location": "bedroom",
+  "location": "somewhere",
   "latitude": 45.058120,
   "longitude": 7.691776,
   "internal": true

@@ -27,6 +27,9 @@ namespace FEZ26 {
         /// <summary>The SD Card module using socket 5 of the mainboard.</summary>
         private Gadgeteer.Modules.GHIElectronics.SDCard sdCard;
         
+        /// <summary>The Extender module using socket 10 of the mainboard.</summary>
+        private Gadgeteer.Modules.GHIElectronics.Extender extender;
+        
         /// <summary>This property provides access to the Mainboard API. This is normally not necessary for an end user program.</summary>
         protected new static GHIElectronics.Gadgeteer.FEZSpiderII Mainboard {
             get {
@@ -53,6 +56,7 @@ namespace FEZ26 {
             this.ethernetJ11D = new GTM.GHIElectronics.EthernetJ11D(7);
             this.breakout = new GTM.GHIElectronics.Breakout(11);
             this.sdCard = new GTM.GHIElectronics.SDCard(5);
+            this.extender = new GTM.GHIElectronics.Extender(10);
         }
     }
 }

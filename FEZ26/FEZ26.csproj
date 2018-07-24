@@ -7,8 +7,8 @@
     <!--This is an executable-->
     <OutputType>Exe</OutputType>
     <AppDesignerFolder>Properties</AppDesignerFolder>
-    <RootNamespace>dht22</RootNamespace>
-    <AssemblyName>dht22</AssemblyName>
+    <RootNamespace>FEZ26</RootNamespace>
+    <AssemblyName>FEZ26</AssemblyName>
     <TargetFrameworkVersion>v4.3</TargetFrameworkVersion>
     <FileAlignment>512</FileAlignment>
     <!--Identify this as a MicroFramework, CSharp project-->
@@ -24,7 +24,7 @@
     <DebugType>full</DebugType>
     <Optimize>false</Optimize>
     <OutputPath>bin\Debug\</OutputPath>
-    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <DefineConstants>DEBUG;TRACE,MF_FRAMEWORK_VERSION_V4_3</DefineConstants>
     <ErrorReport>prompt</ErrorReport>
     <WarningLevel>4</WarningLevel>
   </PropertyGroup>
@@ -44,6 +44,7 @@
   <Import Project="$(NetMfTargetsBaseDir)$(TargetFrameworkVersion)\CSharp.Targets" />
   <ItemGroup>
     <Compile Include="DHT22.cs" />
+    <Compile Include="Measurements.cs" />
     <Compile Include="Program.generated.cs">
       <AutoGen>True</AutoGen>
       <DesignTime>True</DesignTime>
@@ -56,6 +57,7 @@
       <DesignTime>True</DesignTime>
       <DependentUpon>Resources.resx</DependentUpon>
     </Compile>
+    <Compile Include="LightSensor.cs" />
   </ItemGroup>
   <ItemGroup>
     <Reference Include="Gadgeteer" />
@@ -81,6 +83,9 @@
     <Reference Include="GTM.GHIElectronics.EthernetJ11D, Version=4.3.8.1, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
     </Reference>
+    <Reference Include="GTM.GHIElectronics.Extender, Version=4.3.8.1, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+    </Reference>
     <Reference Include="GTM.GHIElectronics.SDCard, Version=4.3.8.1, Culture=neutral, processorArchitecture=MSIL">
       <SpecificVersion>False</SpecificVersion>
     </Reference>
@@ -97,6 +102,7 @@
     </Reference>
     <Reference Include="Microsoft.SPOT.Graphics" />
     <Reference Include="Microsoft.SPOT.Hardware" />
+    <Reference Include="Microsoft.SPOT.IO" />
     <Reference Include="Microsoft.SPOT.Native" />
     <Reference Include="Microsoft.SPOT.Net" />
     <Reference Include="Microsoft.SPOT.Net.Security" />
@@ -126,14 +132,11 @@
     <None Include="Program.gadgeteer.diagram">
       <DependentUpon>Program.gadgeteer</DependentUpon>
     </None>
-    <None Include="Resources\certificate.pem.crt" />
     <None Include="Resources\FEZ26_configuration.json" />
+    <None Include="Resources\FEZ26_sensor0.json" />
     <None Include="Resources\FEZ26_sensor1.json" />
     <None Include="Resources\FEZ26_sensor2.json" />
-    <None Include="Resources\FEZ26_sensor3.json" />
     <None Include="Resources\NinaB.tinyfnt" />
-    <None Include="Resources\root_ca.pem.crt" />
     <None Include="Resources\small.tinyfnt" />
-    <None Include="Resources\YOURPFXFILE.pfx" />
   </ItemGroup>
 </Project>

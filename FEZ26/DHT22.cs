@@ -88,7 +88,7 @@ namespace FEZ26 {
             nb = _dht22in.Read(false, buffer, 0, 80);  // get the sensor answer
             _dht22out.Active = true; // Tristate Write
             _dht22out.Write(true);   // "high up" 
-            if (nb < 71) {
+            if (nb < 69) {
                 LastError = "Did not receive enough data from the sensor";
                 return false;
             }
@@ -98,13 +98,19 @@ namespace FEZ26 {
             byte checksum = 0;
             uint T = 0, H = 0;
             // Convert CheckSum
-            for (i = 0; i < 8; i++, nb -= 2) checksum |= (byte)(buffer[nb] > 35 ? 1 << i : 0);
+            for (i = 0; i < 8; i++, nb -= 2)
+                checksum |= (byte)(buffer[nb] > 35 ? 1 << i : 0);
+
             // Convert Temperature
-            for (i = 0; i < 16; i++, nb -= 2) T |= (uint)(buffer[nb] > 35 ? 1 << i : 0);
+            for (i = 0; i < 16; i++, nb -= 2) 
+                T |= (uint)(buffer[nb] > 35 ? 1 << i : 0);
             Temperature = ((float)(T & 0x7FFF)) * ((T & 0x8000) > 0 ? -1 : 1) / 10;
+
             // Convert Humidity
-            for (i = 0; i < 11; i++, nb -= 2) H |= (uint)(buffer[nb] > 35 ? 1 << i : 0);
+            for (i = 0; i < 10; i++, nb -= 2) 
+                H |= (uint)(buffer[nb] > 35 ? 1 << i : 0);
             Humidity = ((float)H) / 10;
+
             // Check CheckSum
             if ((((H & 0xFF) + (H >> 8) + (T & 0xFF) + (T >> 8)) & 0xFF) != checksum) {
                 LastError = "Checksum Error";
