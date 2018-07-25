@@ -1,9 +1,4 @@
-﻿/* ToDo:
- *    1) Implement Publish from Lambda
- *    2) mandare config file
- *    3) Check config file from lambda
- */
-//#define DEBUG
+﻿//#define DEBUG
 
 using System;
 using System.Collections;
@@ -78,7 +73,7 @@ namespace FEZ26 {
         /// <summary>
         /// Timer
         /// </summary>
-        private GT.Timer gcTimer = new GT.Timer(30000);
+        private GT.Timer gcTimer = new GT.Timer(120000);
 
         /// <summary>
         /// Timer to avoid waiting for ACK in case of lost connection
@@ -93,7 +88,6 @@ namespace FEZ26 {
         /// <summary>
         /// Brightness sensor
         /// </summary>
-        // ToDO: add brightness sensor
         LightSensor brightSensor;
 
         /// <summary>
@@ -436,7 +430,6 @@ namespace FEZ26 {
             Debug.Print("Brightness:\t\t" + brightSensor.Brightness.ToString("F"));
 #endif
 
-            // ToDO: move
             /* Update web data */
             HTML = Encoding.UTF8.GetBytes("<html><body>" +
                 "<h1>Hosted on .NET Gadgeteer</h1>" +
@@ -601,7 +594,6 @@ namespace FEZ26 {
                         try {
                             lock (time_lock) {
                                 //String filename = DateTime.UtcNow.ToString() + ".txt";
-                                //Todo: check if name is ok
                                 /* Create filename: add 'x' at the beginning to show it has wrong time */
                                 String filename = ((correct_time) ? "" : "x") + DateTime.UtcNow.ToString("yyyyMMddHHmmss") + ".json";
 #if (DEBUG)
@@ -620,7 +612,7 @@ namespace FEZ26 {
 #endif
                             }
 
-                            //Todo: empty buffer;
+                            // Empty buffer;
                             meas.measurements.Clear();
                         } catch (Exception e) {
 #if (DEBUG)
@@ -646,8 +638,6 @@ namespace FEZ26 {
             for (; ; ) {
                 network_down_up_event.WaitOne();
                 try {
-                    //Todo: prova a portare su (questo e magari anche clientId)
-
                     // Client naming has to be unique if there was more than one publisher
                     string clientId = Guid.NewGuid().ToString();
 
@@ -689,9 +679,6 @@ namespace FEZ26 {
                     foreach (string filename in sdCard.StorageDevice.ListFiles(sdCard.StorageDevice.RootDirectory)) {
                         if (filename[0] != 'x') {
                             try {
-                                /* Start timer waiting for ACK */
-                                //skip_timer.Start(); // ToDO: start or restart?
-
                                 byte[] to_send;
                                 lock (sd_access)
                                     to_send = sdCard.StorageDevice.ReadFile(filename);
@@ -717,7 +704,6 @@ namespace FEZ26 {
                                     lock (skip_lock) {
                                         if (skip_deletion) {
                                             skip_deletion = false;
-                                            //ToDO: cambiare e mettere continue e, if ehernet.networkdown, mettere break?
                                             break;
                                         }
                                     }
