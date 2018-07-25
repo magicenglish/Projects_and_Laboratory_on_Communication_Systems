@@ -288,7 +288,7 @@ namespace FEZ26 {
             }
 
             /* Enable 15 mins Watchdog */
-            GHI.Processor.Watchdog.Enable(900000);
+            GHI.Processor.Watchdog.Enable(GHI.Processor.Watchdog.MaxTimeoutPeriod);
 
         }
 
