@@ -1,0 +1,15 @@
+{
+    "type": "object",
+    "title": "measurement",
+    "description": "JSON object representing a single measurement in a measurement set",
+    "properties": {
+        "sensor_id": { "type": "integer" },
+        "iso_timestamp": { "type": "string" },
+        "value": { "type": "number" },
+        "status": {
+            "type": "string",
+            "enum": [ "OK", "FAIL", "OUTOFRANGE" ]
+        }
+    },
+    "required": [ "sensor_id", "iso_timestamp", "value", "status" ]
+} NOTE: Status=OUTOFRANGE indicates a measurement (of analogue type) which is above the maximum allowed value or below the minimum one. If the sensor does not provide a corresponding signal to indicate these situations, the OUTOFRANGE status can not be used by the device.

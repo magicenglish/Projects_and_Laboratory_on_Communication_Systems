@@ -1,0 +1,18 @@
+{
+    "type": "object",
+    "title": "measurements",
+    "description": "Set of measurements",
+    "version": "2",
+    "properties": {
+        "version": { "type": "integer" },
+        "device_id": { "type": "string" },
+        "iso_timestamp": { "type": "string" },
+        "measurements": {
+            "type": "array",
+            "items": { "type": "object" },
+            "minItems": 1,
+            "uniqueItems": true
+        }
+    },
+    "required": [ "version", "device_id", "iso_timestamp", "measurements" ]
+} # measurements is a list of objects of the type seen in schema_measurement_transmission.json

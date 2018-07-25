@@ -1,0 +1,25 @@
+{
+    "type": "object",
+    "title": "device",
+    "description": "JSON to configure a device",
+    "version": "2",
+    "properties": {
+        "version": { "type": "integer" },
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "group": { "type": "string" },
+        "type": { "type": "string", "enum": [ "fire", "water", "fissure", "temperature", "other" ] },
+        "sensors": {
+            "type": "array",
+            "items": { "type": "object" },
+            "minItems": 1,
+            "uniqueItems": true
+        },
+        "description": { "type": "string" },
+        "location": { "type": "string" },
+        "latitude": { "type": "number" },
+        "longitude": { "type": "number" },
+        "internal": { "type": "boolean" }
+    },
+    "required": [ "version", "id", "name", "group", "type", "sensors", "description", "location", "latitude", "longitude", "internal" ]
+} NOTE: this scheme fully describes a device. A copy of the configuration file is locally stored on a device, in its non-volatile memory, while another copy is stored in the cloud storage. Any measurement set sent by a device is checked against the configuration of the device to check its consistency.

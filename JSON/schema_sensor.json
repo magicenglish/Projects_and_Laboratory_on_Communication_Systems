@@ -1,0 +1,11 @@
+{
+    "type": "object",
+    "title": "sensor",
+    "description": "Describes a single sensor",
+    "properties": {
+        "id": { "type": "integer" },
+        "name": { "type": "string" },
+        "type": { "type": "string", "enum": [ "water_level", "temperature", "humidity", "flame", "smoke", "co2", "displacement", "pressure", "other" ] }
+    },
+    "required": [ "id", "name", "type" ]
+} NOTE: the Id is locally unique. Each sensor in a single device must have a different Id. Id starts from 1.
