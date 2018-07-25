@@ -14,6 +14,7 @@ using Microsoft.SPOT.Hardware;
 using Microsoft.SPOT.IO;
 using GHI.IO;
 using GHI.IO.Storage;
+using GHI.Processor;
 
 // Network security
 using System.Security;
@@ -286,6 +287,9 @@ namespace FEZ26 {
 #endif
             }
 
+            /* Enable 15 mins Watchdog */
+            GHI.Processor.Watchdog.Enable(900000);
+
         }
 
         /// <summary>
@@ -386,6 +390,8 @@ namespace FEZ26 {
 
             /* Temperature and Humidity measurement */
             if (tempSensor.ReadSensor()) {
+                /* Reset Watchdog counter */
+                GHI.Processor.Watchdog.ResetCounter();
                 if (tempSensor.Temperature != last_temperature || temp_count == 15) {
                     sensor[0] = new Measurement(0, tempSensor.Temperature, "OK");
                     last_temperature = tempSensor.Temperature;
