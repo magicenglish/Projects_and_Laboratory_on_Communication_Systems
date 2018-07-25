@@ -1,4 +1,4 @@
-﻿//#define DEBUG
+﻿#define DEBUG
 
 using System;
 using System.Collections;
@@ -48,12 +48,12 @@ namespace FEZ26 {
         /// <summary>
         /// JSON Format Version
         /// </summary>
-        uint json_version = 2;
+        private const uint json_version = 2;
 
         /// <summary>
         /// Device ID
         /// </summary>
-        string device_id = "FEZ26";
+        private const string device_id = "FEZ26";
 
         /// <summary>
         /// AWS EC2 Endpoint: IPv4 Address of the machine
@@ -74,7 +74,8 @@ namespace FEZ26 {
         /// <summary>
         /// Timer
         /// </summary>
-        private GT.Timer gcTimer = new GT.Timer(120000);
+        //private GT.Timer gcTimer = new GT.Timer(120000);
+        private GT.Timer gcTimer = new GT.Timer(20000);
 
         /// <summary>
         /// Timer to avoid waiting for ACK in case of lost connection
