@@ -1,6 +1,6 @@
-v# Projects and Laboratory on Communication Systems
+# Projects and Laboratory on Communication Systems
 Course project @ Politecnico di Torino, Turin, Italy.
-Group FEZ26, Andrea Casalino ([@andreac94](https://github.com/andreac94)), Pietro Inglese ([@magicenglish](https://github.com/magicenglish)), Flavio Tanese ([@Rookie64](https://github.com/Rookie64v))
+Group FEZ26, Andrea Casalino ([@andreac94](https://github.com/andreac94)), Pietro Inglese ([@magicenglish](https://github.com/magicenglish)), Flavio Tanese ([@Rookie64v](https://github.com/Rookie64v))
 
 Design of a system taking data from sensor, sending it to AWS IoT using MQTT protocol, to finally plot and show data on custom website.
 
